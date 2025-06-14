@@ -1,0 +1,5 @@
+# 제공받은 정보
+DEVICE_TOKEN = "dVFgj5gCw1tUG4hlgXL7i-:APA91bGNXCdH4LmgDbLTupQYJtDH1gYcHrbJkoYi3idPqn62bdLRNP8S2F4lR7b887mKfbrpjHobFyQY2WuXAnu4I6wMSc17RkJ-wBmwzj-Jm9S4XUP1dW8"
+SENDER_ID = "587467948856"  # 프로젝트 번호 (실제 서버 키 아님)
+WEB_PUSH_CERT = "BJFqdr5Ft4ZF8qkt2i1TJN37m1ePszOjd8G8Xg1r2GhdGaRwnfe0baRE934pgZhgQewtc9yxluk5ipD2neOrmMg"
+
