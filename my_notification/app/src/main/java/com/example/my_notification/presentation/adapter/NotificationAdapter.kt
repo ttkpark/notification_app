@@ -36,47 +36,36 @@ class NotificationAdapter(
             binding.apply {
                 textViewTitle.text = notification.title
                 textViewBody.text = notification.body
+                textViewTimestamp.text = formatTimestamp(notification.timestamp)
                 textViewSender.text = "발신자: ${notification.senderId}"
-                textViewTime.text = formatTimestamp(notification.timestamp)
                 
-                // 읽음 상태에 따른 UI 변경
+                // 읽음/읽지 않음 상태 표시
                 root.alpha = if (notification.isRead) 0.6f else 1.0f
-                indicatorUnread.visibility = if (notification.isRead) 
-                    android.view.View.GONE else android.view.View.VISIBLE
-
+                
                 // 클릭 이벤트
                 root.setOnClickListener {
                     onItemClick(notification)
                 }
-
-                // 삭제 버튼 클릭 이벤트
+                
                 buttonDelete.setOnClickListener {
                     onDeleteClick(notification)
                 }
-                
-                // 데이터가 있는 경우 표시
-                if (notification.data.isNotEmpty()) {
-                    textViewData.visibility = android.view.View.VISIBLE
-                    textViewData.text = "추가 데이터: ${notification.data.entries.joinToString(", ") { "${it.key}=${it.value}" }}"
-                } else {
-                    textViewData.visibility = android.view.View.GONE
-                }
             }
         }
-
+        
         private fun formatTimestamp(timestamp: Long): String {
-            val dateFormat = SimpleDateFormat("MM/dd HH:mm", Locale.getDefault())
-            return dateFormat.format(Date(timestamp))
+            val sdf = SimpleDateFormat("MM/dd HH:mm", Locale.getDefault())
+            return sdf.format(Date(timestamp))
         }
     }
+}
 
-    class NotificationDiffCallback : DiffUtil.ItemCallback<NotificationMessage>() {
-        override fun areItemsTheSame(oldItem: NotificationMessage, newItem: NotificationMessage): Boolean {
-            return oldItem.id == newItem.id
-        }
+class NotificationDiffCallback : DiffUtil.ItemCallback<NotificationMessage>() {
+    override fun areItemsTheSame(oldItem: NotificationMessage, newItem: NotificationMessage): Boolean {
+        return oldItem.id == newItem.id
+    }
 
-        override fun areContentsTheSame(oldItem: NotificationMessage, newItem: NotificationMessage): Boolean {
-            return oldItem == newItem
-        }
+    override fun areContentsTheSame(oldItem: NotificationMessage, newItem: NotificationMessage): Boolean {
+        return oldItem == newItem
     }
 } 

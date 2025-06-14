@@ -5,14 +5,27 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.my_notification.databinding.FragmentNotificationListBinding
+import com.example.my_notification.presentation.adapter.NotificationAdapter
+import com.example.my_notification.presentation.state.NotificationUiEvent
+import com.example.my_notification.presentation.viewmodel.NotificationViewModel
 import com.google.android.material.snackbar.Snackbar
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class NotificationListFragment : Fragment() {
     
     private var _binding: FragmentNotificationListBinding? = null
     private val binding get() = _binding!!
+    
+    private val viewModel: NotificationViewModel by viewModels()
+    private lateinit var notificationAdapter: NotificationAdapter
     
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -28,21 +41,31 @@ class NotificationListFragment : Fragment() {
         
         setupRecyclerView()
         setupViews()
-        showEmptyState()
+        observeViewModel()
     }
     
     private fun setupRecyclerView() {
+        notificationAdapter = NotificationAdapter(
+            onItemClick = { notification ->
+                if (!notification.isRead) {
+                    viewModel.handleEvent(NotificationUiEvent.MarkAsRead(notification.id))
+                }
+            },
+            onDeleteClick = { notification ->
+                viewModel.handleEvent(NotificationUiEvent.DeleteNotification(notification.id))
+            }
+        )
+        
         binding.recyclerViewNotifications.apply {
             layoutManager = LinearLayoutManager(requireContext())
-            // 임시로 어댑터 없이 설정
+            adapter = notificationAdapter
         }
     }
     
     private fun setupViews() {
         binding.swipeRefreshLayout.setOnRefreshListener {
-            // 새로고침 기능 (임시)
+            viewModel.handleEvent(NotificationUiEvent.LoadNotifications)
             binding.swipeRefreshLayout.isRefreshing = false
-            Snackbar.make(binding.root, "알림 목록을 새로고침했습니다.", Snackbar.LENGTH_SHORT).show()
         }
         
         binding.fabClearAll.setOnClickListener {
@@ -50,10 +73,37 @@ class NotificationListFragment : Fragment() {
         }
     }
     
-    private fun showEmptyState() {
-        // 임시로 빈 상태 표시
-        binding.textViewEmpty.visibility = View.VISIBLE
-        binding.recyclerViewNotifications.visibility = View.GONE
+    private fun observeViewModel() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    updateUI(state)
+                }
+            }
+        }
+    }
+    
+    private fun updateUI(state: com.example.my_notification.presentation.state.NotificationUiState) {
+        // 로딩 상태
+        binding.swipeRefreshLayout.isRefreshing = state.isLoading
+        
+        // 알림 목록 업데이트
+        notificationAdapter.submitList(state.notifications)
+        
+        // 빈 상태 표시
+        if (state.notifications.isEmpty()) {
+            binding.textViewEmpty.visibility = View.VISIBLE
+            binding.recyclerViewNotifications.visibility = View.GONE
+        } else {
+            binding.textViewEmpty.visibility = View.GONE
+            binding.recyclerViewNotifications.visibility = View.VISIBLE
+        }
+        
+        // 에러 메시지 표시
+        state.errorMessage?.let { message ->
+            Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
+            viewModel.handleEvent(NotificationUiEvent.ClearError)
+        }
     }
     
     private fun showClearAllConfirmation() {

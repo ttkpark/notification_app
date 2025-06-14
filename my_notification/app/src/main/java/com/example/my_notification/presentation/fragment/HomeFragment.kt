@@ -8,14 +8,24 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.example.my_notification.databinding.FragmentHomeBinding
+import com.example.my_notification.presentation.state.NotificationUiEvent
+import com.example.my_notification.presentation.viewmodel.NotificationViewModel
 import com.google.android.material.snackbar.Snackbar
-import com.google.firebase.messaging.FirebaseMessaging
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class HomeFragment : Fragment() {
     
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
+    
+    private val viewModel: NotificationViewModel by viewModels()
     
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -30,7 +40,7 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         
         setupViews()
-        loadFcmToken()
+        observeViewModel()
     }
     
     private fun setupViews() {
@@ -39,33 +49,44 @@ class HomeFragment : Fragment() {
         }
         
         binding.buttonRefreshToken.setOnClickListener {
-            loadFcmToken()
+            viewModel.handleEvent(NotificationUiEvent.RefreshToken)
         }
         
         binding.swipeRefreshLayout.setOnRefreshListener {
-            loadFcmToken()
+            viewModel.handleEvent(NotificationUiEvent.LoadNotifications)
+            viewModel.handleEvent(NotificationUiEvent.RefreshToken)
             binding.swipeRefreshLayout.isRefreshing = false
         }
     }
     
-    private fun loadFcmToken() {
-        binding.progressBarToken.visibility = View.VISIBLE
-        
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            binding.progressBarToken.visibility = View.GONE
-            
-            if (!task.isSuccessful) {
-                binding.textViewToken.text = "토큰을 가져올 수 없습니다."
-                return@addOnCompleteListener
+    private fun observeViewModel() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    updateUI(state)
+                }
             }
-
-            // FCM 토큰 표시
-            val token = task.result
-            binding.textViewToken.text = token
-            
-            // 통계 정보 업데이트 (임시 데이터)
-            binding.textViewNotificationCount.text = "총 0개의 알림"
-            binding.textViewUnreadCount.text = "읽지 않음: 0개"
+        }
+    }
+    
+    private fun updateUI(state: com.example.my_notification.presentation.state.NotificationUiState) {
+        // 토큰 로딩 상태
+        binding.progressBarToken.visibility = if (state.isTokenLoading) View.VISIBLE else View.GONE
+        
+        // FCM 토큰 표시
+        binding.textViewToken.text = state.fcmToken ?: "토큰을 가져오는 중..."
+        
+        // 알림 통계 업데이트
+        val totalCount = state.notifications.size
+        val unreadCount = state.notifications.count { !it.isRead }
+        
+        binding.textViewNotificationCount.text = "총 ${totalCount}개의 알림"
+        binding.textViewUnreadCount.text = "읽지 않음: ${unreadCount}개"
+        
+        // 에러 메시지 표시
+        state.errorMessage?.let { message ->
+            Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
+            viewModel.handleEvent(NotificationUiEvent.ClearError)
         }
     }
     
